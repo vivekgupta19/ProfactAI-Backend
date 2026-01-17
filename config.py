@@ -17,7 +17,7 @@ PGVECTOR_DIM = int(os.environ.get("PGVECTOR_DIM", "1536"))
 # CORS configuration
 # Comma-separated list of allowed origins for the frontend (Vercel domain, localhost, etc).
 # Example: "https://your-app.vercel.app,http://localhost:3000"
-CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+CORS_ORIGINS = os.environ.get("https://profactai-frontend.vercel.app")
 
 # OpenAI configuration (ChatGPT + embeddings)
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")

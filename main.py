@@ -30,7 +30,7 @@ JOB_METADATA: Dict[str, Dict[str, Any]] = {}
 
 def _parse_cors_origins(raw: Optional[str]) -> list[str]:
     origins = [o.strip() for o in (raw or "").split(",") if o.strip()]
-    return origins or ["http://localhost:3000", "http://127.0.0.1:3000"]
+    return origins or ["https://profactai-frontend.vercel.app"]
 
 
 app = FastAPI()
