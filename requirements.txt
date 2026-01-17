@@ -1,0 +1,11 @@
+flask
+flask-cors
+pandas
+openpyxl
+chromadb
+openai
+psycopg2-binary
+python-dotenv
+bcrypt
+pyjwt
+supabase
