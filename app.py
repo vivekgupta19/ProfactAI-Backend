@@ -522,6 +522,9 @@ def create_app():
     return app
 
 
+# Create the Flask app instance for Gunicorn
+app = create_app()
+
 if __name__ == "__main__":
     # Initialize superadmin if not exists
     try:
@@ -540,8 +543,7 @@ if __name__ == "__main__":
                 print("✅ Superadmin user created successfully")
     except Exception as e:
         print(f"⚠️  Could not create superadmin: {e}")
-    
-    flask_app = create_app()
+
     port = int(os.environ.get("PORT", "5001"))
     debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
-    flask_app.run(host="0.0.0.0", port=port, debug=debug)
+    app.run(host="0.0.0.0", port=port, debug=debug)
