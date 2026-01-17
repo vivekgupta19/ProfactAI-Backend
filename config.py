@@ -8,8 +8,16 @@ PROJECT_ROOT = BASE_DIR.parent
 # Path where Excel files are stored. By default, use project root where your .xlsx files are.
 EXCEL_DATA_DIR = os.environ.get("EXCEL_DATA_DIR", str(PROJECT_ROOT))
 
-# ChromaDB persistent directory
-CHROMA_DB_DIR = os.environ.get("CHROMA_DB_DIR", str(PROJECT_ROOT / "chroma_db"))
+# Vector store configuration (Supabase Postgres + pgvector)
+# NOTE: This backend expects DATABASE_URL to point to a Postgres database (e.g. Supabase).
+PGVECTOR_TABLE = os.environ.get("PGVECTOR_TABLE", "rag_documents")
+# text-embedding-3-small is 1536 dims. If you change OPENAI_EMBEDDING_MODEL, update this.
+PGVECTOR_DIM = int(os.environ.get("PGVECTOR_DIM", "1536"))
+
+# CORS configuration
+# Comma-separated list of allowed origins for the frontend (Vercel domain, localhost, etc).
+# Example: "https://your-app.vercel.app,http://localhost:3000"
+CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
 
 # OpenAI configuration (ChatGPT + embeddings)
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")

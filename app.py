@@ -5,7 +5,7 @@ import os
 import uuid
 import pandas as pd
 
-from config import TOP_K
+from config import TOP_K, CORS_ORIGINS
 from rag import ingestion, vectorstore, llm
 from auth import (
     register_user, login_user, logout_user, require_auth, 
@@ -27,9 +27,10 @@ def create_app():
     app = Flask(__name__)
     
     # Enhanced CORS configuration
+    origins = [o.strip() for o in (CORS_ORIGINS or "").split(",") if o.strip()]
     CORS(app, 
          resources={r"/api/*": {
-             "origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+             "origins": origins or ["http://localhost:3000", "http://127.0.0.1:3000"],
              "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
              "allow_headers": ["Content-Type", "Authorization"],
              "expose_headers": ["Content-Type"],
@@ -135,7 +136,7 @@ def create_app():
     @app.route("/api/upload_document", methods=["POST"])
     @require_auth
     def upload_document(user):
-        """Upload a document and index it into ChromaDB"""
+        """Upload a document and index it into Postgres (pgvector)"""
         if "file" not in request.files:
             return jsonify({"error": "No file part in the request"}), 400
 
@@ -541,4 +542,6 @@ if __name__ == "__main__":
         print(f"⚠️  Could not create superadmin: {e}")
     
     flask_app = create_app()
-    flask_app.run(host="0.0.0.0", port=5001, debug=True)
+    port = int(os.environ.get("PORT", "5001"))
+    debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    flask_app.run(host="0.0.0.0", port=port, debug=debug)

@@ -40,7 +40,7 @@ def _index_sheets(
     organization_id: str,
     user_id: str
 ) -> Dict:
-    """Index all sheets/rows from a single file into ChromaDB"""
+    """Index all sheets/rows from a single file into Postgres (pgvector)"""
     total_rows = 0
     added_docs = 0
 
@@ -62,10 +62,10 @@ def _index_sheets(
             metadata = {
                 "file": file_name,
                 "sheet": sheet_name,
-                "rowIndex": int(idx),
-                "numColumns": len(df.columns),
-                "organizationId": organization_id,
-                "userId": user_id
+                "row_index": int(idx),
+                "num_columns": len(df.columns),
+                "organization_id": organization_id,
+                "user_id": user_id,
             }
 
             batch_texts.append(text)
@@ -106,7 +106,7 @@ def _index_sheets(
 def build_index(organization_id: str, user_id: str, rebuild: bool = True) -> Dict:
     """
     Read all document files on disk for an organization,
-    convert rows to text, embed, and store in ChromaDB.
+    convert rows to text, embed, and store in Postgres (pgvector).
     """
     if rebuild:
         collection = vectorstore.reset_user_collection(organization_id)
@@ -169,7 +169,7 @@ def index_uploaded_file(
     user_id: str
 ) -> Dict:
     """
-    Index a single uploaded file (provided as a binary stream) into ChromaDB.
+    Index a single uploaded file (provided as a binary stream) into Postgres (pgvector).
     Does NOT reset the collection. New rows are appended to existing index.
     """
     file_ext = Path(file_name).suffix.lower()

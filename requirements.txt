@@ -2,9 +2,9 @@ flask
 flask-cors
 pandas
 openpyxl
-chromadb
 openai
 psycopg2-binary
+gunicorn
 python-dotenv
 bcrypt
 pyjwt
