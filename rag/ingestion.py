@@ -1,11 +1,13 @@
 import os
+from io import BytesIO
 from pathlib import Path
 from typing import Dict, List, BinaryIO
+
+import openpyxl
 import pandas as pd
 
 from config import EXCEL_DATA_DIR
-from . import vectorstore
-from . import llm
+from . import llm, vectorstore
 from database import db
 
 
@@ -34,6 +36,74 @@ def _row_to_text(file_name: str, sheet_name: str, row_index: int, row: pd.Series
     return " | ".join(parts)
 
 
+def _read_excel_sheets_from_bytes(data: bytes, file_name: str) -> Dict[str, pd.DataFrame]:
+    """
+    Robustly read all sheets from an Excel file into a dict of DataFrames.
+
+    We try, in order:
+      1) pandas.read_excel (all sheets, default engine)
+      2) pandas.read_excel with explicit openpyxl engine
+      3) openpyxl.load_workbook + manual conversion to DataFrames
+
+    This is specifically to avoid brittle "tuple index out of range" errors that
+    sometimes surface from the underlying Excel engines.
+    """
+
+    last_exc: Exception | None = None
+
+    # 1) pandas.read_excel with default engine
+    try:
+        with BytesIO(data) as bio:
+            sheets = pd.read_excel(bio, sheet_name=None, dtype=str)
+        cleaned: Dict[str, pd.DataFrame] = {}
+        for name, df in sheets.items():
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                cleaned[name] = df.fillna("")
+        if cleaned:
+            return cleaned
+    except Exception as exc:  # pragma: no cover - defensive
+        last_exc = exc
+
+    # 2) pandas.read_excel with explicit openpyxl engine
+    try:
+        with BytesIO(data) as bio:
+            sheets = pd.read_excel(bio, sheet_name=None, dtype=str, engine="openpyxl")
+        cleaned = {}
+        for name, df in sheets.items():
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                cleaned[name] = df.fillna("")
+        if cleaned:
+            return cleaned
+    except Exception as exc:  # pragma: no cover - defensive
+        last_exc = exc
+
+    # 3) Fallback: use openpyxl directly and build DataFrames sheet-by-sheet
+    try:
+        wb = openpyxl.load_workbook(filename=BytesIO(data), read_only=True, data_only=True)
+        cleaned: Dict[str, pd.DataFrame] = {}
+        for ws in wb.worksheets:
+            values_iter = ws.iter_rows(values_only=True)
+            try:
+                headers = next(values_iter)
+            except StopIteration:
+                continue
+
+            headers = [str(h) if h is not None else "" for h in headers]
+            rows = list(values_iter)
+            if not rows:
+                continue
+
+            df = pd.DataFrame(rows, columns=headers, dtype=str)
+            cleaned[ws.title] = df.fillna("")
+
+        if cleaned:
+            return cleaned
+    except Exception as exc:  # pragma: no cover - defensive
+        last_exc = exc
+
+    raise RuntimeError(f"Failed to read Excel file '{file_name}': {last_exc}")
+
+
 def _index_sheets(
     file_name: str,
     sheets: Dict[str, pd.DataFrame],
@@ -52,8 +122,6 @@ def _index_sheets(
     for sheet_name, df in sheets.items():
         if df is None or df.empty:
             continue
-
-        df = df.fillna("")
 
         for idx, row in df.iterrows():
             total_rows += 1
@@ -127,11 +195,14 @@ def build_index(organization_id: str, user_id: str, rebuild: bool = True) -> Dic
             if file_ext == ".csv":
                 # For CSV, treat as single sheet
                 df = pd.read_csv(file_path, dtype=str)
-                sheets = {"Sheet1": df}
+                sheets = {"Sheet1": df.fillna("")}
             else:
-                sheets = pd.read_excel(file_path, sheet_name=None, dtype=str)
+                with file_path.open("rb") as f:
+                    data = f.read()
+                sheets = _read_excel_sheets_from_bytes(data, file_name)
         except Exception:
-            continue  # Skip unreadable files
+            # Skip unreadable files but keep the job going
+            continue
 
         stats = _index_sheets(file_name, sheets, organization_id, user_id)
         agg_total_rows += stats["totalRowsSeen"]
@@ -177,13 +248,16 @@ def index_uploaded_file(
     try:
         if file_ext == ".csv":
             df = pd.read_csv(file_stream, dtype=str)
-            sheets = {"Sheet1": df}
+            sheets = {"Sheet1": df.fillna("")}
         else:
-            sheets = pd.read_excel(file_stream, sheet_name=None, dtype=str)
+            # Read the entire stream into memory once so we can safely retry
+            data = file_stream.read()
+            sheets = _read_excel_sheets_from_bytes(data, file_name)
     except Exception as exc:
+        # Normalize low-level Excel engine errors into a clear message
         raise RuntimeError(f"Failed to read uploaded file '{file_name}': {exc}")
 
-    stats = _index_sheets(file_name, sheets, organization_id, user_id)
+    raw_stats = _index_sheets(file_name, sheets, organization_id, user_id)
     
     # Record document in database
     try:
@@ -194,11 +268,17 @@ def index_uploaded_file(
             file_name=file_name,
             file_type=file_ext,
             file_size=0,  # Size not available from stream
-            total_rows=stats["totalRowsSeen"],
-            indexed_rows=stats["documentsAdded"]
+            total_rows=raw_stats["totalRowsSeen"],
+            indexed_rows=raw_stats["documentsAdded"]
         )
     except Exception as e:
         print(f"Warning: Could not record document in DB: {e}")
-    
-    stats["collectionName"] = vectorstore.get_user_collection(organization_id).name
-    return stats
+
+    # Shape stats to what the frontend expects (snake_case keys)
+    api_stats = {
+        "file_name": raw_stats["fileName"],
+        "total_rows_seen": raw_stats["totalRowsSeen"],
+        "documents_added": raw_stats["documentsAdded"],
+        "collection_name": vectorstore.get_user_collection(organization_id).name,
+    }
+    return api_stats
