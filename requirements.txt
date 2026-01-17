@@ -1,12 +1,12 @@
+flask
+flask-cors
 pandas
 openpyxl
+chromadb
+chromadb-client
 openai
 psycopg2-binary
-gunicorn
 python-dotenv
 bcrypt
 pyjwt
 supabase
-fastapi
-uvicorn[standard]
-python-multipart
