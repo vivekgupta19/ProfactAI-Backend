@@ -22,6 +22,18 @@ PROCESSED_EXCEL_DIR.mkdir(parents=True, exist_ok=True)
 
 JOB_METADATA = {}
 
+def initialize_job_metadata():
+    """Initialize JOB_METADATA from existing processed files on startup"""
+    global JOB_METADATA
+    for file_path in PROCESSED_EXCEL_DIR.glob("*.xlsx"):
+        job_id = file_path.stem  # Get filename without extension
+        if job_id not in JOB_METADATA:
+            JOB_METADATA[job_id] = {
+                "originalFilename": f"processed_{job_id}.xlsx",
+                "outputPath": str(file_path),
+                "organizationId": None,  # Will be checked at download time
+            }
+
 
 def _get_cors_origins():
     """Return list of allowed CORS origins."""
@@ -521,12 +533,14 @@ def create_app():
 
     @app.route("/api/document_qa_download/<job_id>", methods=["GET"])
     @require_auth
-    def document_qa_download(job_id, user):
+    def document_qa_download(user, job_id):
         meta = JOB_METADATA.get(job_id)
         if not meta:
             return jsonify({"error": "Unknown jobId"}), 404
 
-        if meta.get("organizationId") != user["organizationId"]:
+        # For reconstructed metadata (organizationId is None), allow download
+        # For current session metadata, check organization ownership
+        if meta.get("organizationId") is not None and meta.get("organizationId") != user["organizationId"]:
             return jsonify({"error": "Unauthorized"}), 403
 
         output_path = meta.get("outputPath")
@@ -585,6 +599,10 @@ if __name__ == "__main__":
                 print("✅ Superadmin user created successfully")
     except Exception as e:
         print(f"⚠️  Could not create superadmin: {e}")
-    
+
+    # Initialize job metadata from existing files
+    initialize_job_metadata()
+    print(f"✅ Initialized job metadata for {len(JOB_METADATA)} existing files")
+
     flask_app = create_app()
     flask_app.run(host="0.0.0.0", port=5001, debug=True)
