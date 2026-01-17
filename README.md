@@ -1,4 +1,4 @@
-# ExcelAI Backend (Flask + Supabase Postgres pgvector + OpenAI)
+# ExcelAI Backend (FastAPI + Supabase Postgres pgvector + OpenAI)
 
 This backend turns your Excel rows into a Retrieval-Augmented Generation (RAG) system:
 
@@ -48,7 +48,7 @@ export PGVECTOR_DIM=1536
 ```bash
 cd backend
 export PORT=5001
-python app.py
+uvicorn main:app --host 0.0.0.0 --port $PORT
 ```
 
 ## Production (Railway)
@@ -56,7 +56,7 @@ python app.py
 Recommended start command (from repo root):
 
 ```bash
-cd backend && gunicorn -w 2 -b 0.0.0.0:$PORT "app:create_app()"
+cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
 ```
 
 ## Reindex / ingestion

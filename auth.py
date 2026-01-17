@@ -2,8 +2,6 @@ import os
 import jwt
 import bcrypt
 from datetime import datetime, timedelta
-from functools import wraps
-from flask import request, jsonify
 from typing import Optional, Dict, Any
 import re
 
@@ -70,55 +68,6 @@ def create_slug(text: str) -> str:
     slug = re.sub(r'[^a-z0-9]+', '-', slug)
     slug = slug.strip('-')
     return slug
-
-
-def get_current_user_from_request() -> Optional[Dict[str, Any]]:
-    """Extract and validate user from request authorization header"""
-    auth_header = request.headers.get('Authorization')
-    if not auth_header or not auth_header.startswith('Bearer '):
-        return None
-    
-    token = auth_header.split(' ')[1]
-    session = db.get_session_by_token(token)
-    
-    if not session:
-        return None
-    
-    return {
-        "userId": session["userid"],
-        "email": session["email"],
-        "fullName": session["fullname"],
-        "role": session["role"],
-        "organizationId": session["organizationid"],
-        "organizationName": session["organizationname"],
-        "organizationSlug": session["organizationslug"]
-    }
-
-
-def require_auth(f):
-    """Decorator to require authentication for a route"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        user = get_current_user_from_request()
-        if not user:
-            return jsonify({"error": "Authentication required"}), 401
-        return f(user, *args, **kwargs)
-    return decorated_function
-
-
-def require_role(*allowed_roles):
-    """Decorator to require specific roles for a route"""
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            user = get_current_user_from_request()
-            if not user:
-                return jsonify({"error": "Authentication required"}), 401
-            if user["role"] not in allowed_roles:
-                return jsonify({"error": "Insufficient permissions"}), 403
-            return f(user, *args, **kwargs)
-        return decorated_function
-    return decorator
 
 
 def register_user(

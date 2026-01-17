@@ -1,5 +1,3 @@
-flask
-flask-cors
 pandas
 openpyxl
 openai
@@ -9,3 +7,6 @@ python-dotenv
 bcrypt
 pyjwt
 supabase
+fastapi
+uvicorn[standard]
+python-multipart
